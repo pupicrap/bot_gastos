@@ -10,6 +10,7 @@ import aiohttp
 # -----------------------
 TOKEN = os.environ["TOKEN"]
 RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")  # Render la inyecta sola
+PORT = int(os.environ.get("PORT", 10000))
 DATA_FILE = "deuda.json"
 
 # Inicializar archivo si no existe
@@ -124,15 +125,12 @@ async def keep_awake():
             print("Error ping auto:", e)
         await asyncio.sleep(600)  # cada 10 minutos
 
-# -----------------------
-# Configuración del bot
-# -----------------------
-
-
-# Hook para iniciar keep_alive cuando el loop esté listo
 async def start_keep_awake(app):
     asyncio.create_task(keep_awake())
 
+# -----------------------
+# Configuración del bot
+# -----------------------
 app = ApplicationBuilder().token(TOKEN).post_init(start_keep_awake).build()
 
 # Handlers
@@ -143,11 +141,18 @@ app.add_handler(CommandHandler("datosdeuda", datosdeuda))
 app.add_handler(CommandHandler("resetdeuda", resetdeuda))
 app.add_handler(CommandHandler("help", help_command))
 
-
 print("Bot iniciado beep beep!")
 
 # -----------------------
-# Polling
+# Polling con puerto expuesto para Render
 # -----------------------
-app.run_polling()
+# Esto evita que Render "duerma" el servicio
+async def main():
+    # Crea task para keep_awake
+    asyncio.create_task(keep_awake())
+    # Ejecuta polling
+    await app.run_polling()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 
