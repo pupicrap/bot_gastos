@@ -59,8 +59,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/help\n"
         "Muestra esta ayuda"
     )
-    await update.message.reply_text(mensaje, parse_mode="Markdown")
-
+    await update.message.reply_text(mensaje)
 
 # Comando /deuda
 async def deuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
