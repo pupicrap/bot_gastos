@@ -3,7 +3,14 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import json
 import os
 
-# Archivo donde guardamos los datos
+# -----------------------
+# Configuración
+# -----------------------
+TOKEN = os.environ["TOKEN"]
+PORT = int(os.environ.get("PORT", 10000))
+RENDER_URL = os.environ["RENDER_EXTERNAL_URL"]  # Render la inyecta sola
+WEBHOOK_URL = f"{RENDER_URL}/{TOKEN}"
+
 DATA_FILE = "deuda.json"
 
 # Inicializar archivo si no existe
@@ -11,22 +18,25 @@ if not os.path.exists(DATA_FILE):
     with open(DATA_FILE, "w") as f:
         json.dump([], f)
 
-# Función para leer datos
+# -----------------------
+# Funciones de datos
+# -----------------------
 def leer_datos():
     with open(DATA_FILE, "r") as f:
         return json.load(f)
 
-# Función para guardar datos
 def guardar_datos(lista):
     with open(DATA_FILE, "w") as f:
         json.dump(lista, f)
 
-# Comando /gastamos <número> [nota opcional]
+# -----------------------
+# Comandos
+# -----------------------
 async def gastamos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 1:
         await update.message.reply_text("Usa /gastamos <número> [nota opcional]")
         return
-    
+
     try:
         cantidad = float(context.args[0])
     except ValueError:
@@ -41,90 +51,71 @@ async def gastamos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     guardar_datos(datos)
 
     total = sum(d["cantidad"] for d in datos)
-    await update.message.reply_text(f"Gasto de {cantidad} agregado por {usuario}. Total ahora: {total}")
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    mensaje = (
-        "🤖 *Bot de gastos – Comandos disponibles*\n\n"
-        "/gastamos <monto> <nota>\n"
-        "Ej: /gastamos 10000 almacen chino\n\n"
-        "/datosdeuda\n"
-        "Muestra el detalle de todos los gastos\n\n"
-        "/dividir\n"
-        "Muestra quién debe pagar y quién debe recibir\n\n"
-        "/deuda\n"
-        "Muestra el total de gastos\n\n"
-        "/resetdeuda\n"
-        "Reinicia todos los gastos a 0\n\n"
-        "/help\n"
-        "Muestra esta ayuda"
+    await update.message.reply_text(
+        f"Gasto de {cantidad} agregado por {usuario}. Total ahora: {total}"
     )
-    await update.message.reply_text(mensaje)
 
-# Comando /deuda
 async def deuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     datos = leer_datos()
     total = sum(d["cantidad"] for d in datos)
     await update.message.reply_text(f"Deuda total: {total}")
 
-# Comando /dividir
 async def dividir(update: Update, context: ContextTypes.DEFAULT_TYPE):
     datos = leer_datos()
     if not datos:
         await update.message.reply_text("No hay gastos registrados.")
         return
 
-    # Calcular total por usuario
     gasto_por_usuario = {}
     for d in datos:
         gasto_por_usuario[d["usuario"]] = gasto_por_usuario.get(d["usuario"], 0) + d["cantidad"]
 
-    num_usuarios = len(gasto_por_usuario)
-    total_general = sum(gasto_por_usuario.values())
-    promedio = total_general / num_usuarios
+    total = sum(gasto_por_usuario.values())
+    promedio = total / len(gasto_por_usuario)
 
     mensaje = "Balance de pagos:\n"
     for usuario, gasto in gasto_por_usuario.items():
         balance = gasto - promedio
         if balance > 0:
-            mensaje += f"{usuario} puso {gasto} → debería recibir {balance}\n"
+            mensaje += f"{usuario} debería recibir {balance}\n"
         elif balance < 0:
-            mensaje += f"{usuario} puso {gasto} → debería pagar {abs(balance)}\n"
+            mensaje += f"{usuario} debería pagar {abs(balance)}\n"
         else:
-            mensaje += f"{usuario} puso {gasto} → está equilibrado\n"
+            mensaje += f"{usuario} está equilibrado\n"
 
     await update.message.reply_text(mensaje)
 
-# Comando /datosdeuda
 async def datosdeuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     datos = leer_datos()
     if not datos:
         await update.message.reply_text("No hay gastos registrados.")
         return
-    
+
     mensaje = ""
     for d in datos:
-        nota = f" - {d['nota']}" if d['nota'] else ""
+        nota = f" - {d['nota']}" if d["nota"] else ""
         mensaje += f"{d['usuario']}: {d['cantidad']}{nota}\n"
-    
+
     await update.message.reply_text(f"Desglose de gastos:\n{mensaje}")
 
-# Comando /resetdeuda
 async def resetdeuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     guardar_datos([])
     await update.message.reply_text("Deuda reiniciada a 0.")
 
-# -----------------------
-# Token de BotFather
-# -----------------------
-import os
-TOKEN = os.environ["TOKEN"]
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "/gastamos <monto> <nota>\n"
+        "/deuda\n"
+        "/dividir\n"
+        "/datosdeuda\n"
+        "/resetdeuda"
+    )
 
-
-# Crear aplicación
+# -----------------------
+# App
+# -----------------------
 app = ApplicationBuilder().token(TOKEN).build()
 
-# Añadir handlers
 app.add_handler(CommandHandler("gastamos", gastamos))
 app.add_handler(CommandHandler("deuda", deuda))
 app.add_handler(CommandHandler("dividir", dividir))
@@ -132,7 +123,14 @@ app.add_handler(CommandHandler("datosdeuda", datosdeuda))
 app.add_handler(CommandHandler("resetdeuda", resetdeuda))
 app.add_handler(CommandHandler("help", help_command))
 
+print("Bot iniciado beep beep!")
 
-print("Bot de gastos iniciado...")
-app.run_polling()
+# -----------------------
+# Webhook
+# -----------------------
+app.run_webhook(
+    listen="0.0.0.0",
+    port=PORT,
+    webhook_url=WEBHOOK_URL
+)
 
