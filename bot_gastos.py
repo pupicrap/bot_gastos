@@ -6,21 +6,16 @@ import asyncio
 import aiohttp
 from aiohttp import web
 
-# -----------------------
-# Configuración
-# -----------------------
 TOKEN = os.environ["TOKEN"]
-RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")
+RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")  # URL que UptimeRobot va a pingear
 PORT = int(os.environ.get("PORT", 10000))
 DATA_FILE = "deuda.json"
 
+# Inicializar archivo si no existe
 if not os.path.exists(DATA_FILE):
     with open(DATA_FILE, "w") as f:
         json.dump([], f)
 
-# -----------------------
-# Funciones de datos
-# -----------------------
 def leer_datos():
     with open(DATA_FILE, "r") as f:
         return json.load(f)
@@ -30,7 +25,7 @@ def guardar_datos(lista):
         json.dump(lista, f)
 
 # -----------------------
-# Comandos
+# Comandos del bot
 # -----------------------
 async def gastamos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 1:
@@ -54,49 +49,11 @@ async def deuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total = sum(d["cantidad"] for d in datos)
     await update.message.reply_text(f"Deuda total: {total}")
 
-async def dividir(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    datos = leer_datos()
-    if not datos:
-        await update.message.reply_text("No hay gastos registrados.")
-        return
-    gasto_por_usuario = {}
-    for d in datos:
-        gasto_por_usuario[d["usuario"]] = gasto_por_usuario.get(d["usuario"], 0) + d["cantidad"]
-    total = sum(gasto_por_usuario.values())
-    promedio = total / len(gasto_por_usuario)
-    mensaje = "Balance de pagos:\n"
-    for usuario, gasto in gasto_por_usuario.items():
-        balance = gasto - promedio
-        if balance > 0:
-            mensaje += f"{usuario} debería recibir {balance}\n"
-        elif balance < 0:
-            mensaje += f"{usuario} debería pagar {abs(balance)}\n"
-        else:
-            mensaje += f"{usuario} está equilibrado\n"
-    await update.message.reply_text(mensaje)
-
-async def datosdeuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    datos = leer_datos()
-    if not datos:
-        await update.message.reply_text("No hay gastos registrados.")
-        return
-    mensaje = ""
-    for d in datos:
-        nota = f" - {d['nota']}" if d["nota"] else ""
-        mensaje += f"{d['usuario']}: {d['cantidad']}{nota}\n"
-    await update.message.reply_text(f"Desglose de gastos:\n{mensaje}")
-
-async def resetdeuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    guardar_datos([])
-    await update.message.reply_text("Deuda reiniciada a 0.")
-
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "/gastamos <monto> <nota>\n/deuda\n/dividir\n/datosdeuda\n/resetdeuda"
-    )
+    await update.message.reply_text("/gastamos <monto> <nota>\n/deuda\n/dividir\n/datosdeuda\n/resetdeuda")
 
 # -----------------------
-# Keep-alive y web server
+# Keep-alive y web server para Render
 # -----------------------
 async def keep_awake():
     if not RENDER_URL:
@@ -107,7 +64,7 @@ async def keep_awake():
                 await session.get(RENDER_URL)
         except Exception as e:
             print("Error ping auto:", e)
-        await asyncio.sleep(600)
+        await asyncio.sleep(600)  # cada 10 min
 
 async def web_server():
     async def handle_root(request):
@@ -118,30 +75,23 @@ async def web_server():
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-    print(f"Web server corriendo en puerto {PORT}")
 
 # -----------------------
-# Main
+# Configuración del bot
 # -----------------------
-async def main():
-    # Crear bot y handlers
-    app_bot = ApplicationBuilder().token(TOKEN).build()
-    app_bot.add_handler(CommandHandler("gastamos", gastamos))
-    app_bot.add_handler(CommandHandler("deuda", deuda))
-    app_bot.add_handler(CommandHandler("dividir", dividir))
-    app_bot.add_handler(CommandHandler("datosdeuda", datosdeuda))
-    app_bot.add_handler(CommandHandler("resetdeuda", resetdeuda))
-    app_bot.add_handler(CommandHandler("help", help_command))
+app_bot = ApplicationBuilder().token(TOKEN).build()
+app_bot.add_handler(CommandHandler("gastamos", gastamos))
+app_bot.add_handler(CommandHandler("deuda", deuda))
+app_bot.add_handler(CommandHandler("help", help_command))
 
-    print("Bot iniciado beep beep!")
+print("Bot iniciado beep beep!")
 
-    # Lanzar keep-alive y web server
-    asyncio.create_task(keep_awake())
-    asyncio.create_task(web_server())
-
-    # Inicia polling (bloqueante)
-    await app_bot.run_polling()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+# -----------------------
+# Start polling + tareas async
+# -----------------------
+loop = asyncio.get_event_loop()
+loop.create_task(keep_awake())
+loop.create_task(web_server())
+loop.create_task(app_bot.run_polling())
+loop.run_forever()
 
