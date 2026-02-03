@@ -2,16 +2,15 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import json
 import os
+import asyncio
+import aiohttp
 
 # -----------------------
 # Configuración
 # -----------------------
 TOKEN = os.environ["TOKEN"]
-PORT = int(os.environ.get("PORT", 10000))
-RENDER_URL = os.environ["RENDER_EXTERNAL_URL"]  # Render la inyecta sola
-WEBHOOK_URL = f"{RENDER_URL}/{TOKEN}"
-
 DATA_FILE = "deuda.json"
+RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")  # Render la inyecta sola
 
 # Inicializar archivo si no existe
 if not os.path.exists(DATA_FILE):
@@ -112,6 +111,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # -----------------------
+# Keep-alive para Render
+# -----------------------
+async def keep_awake():
+    if not RENDER_URL:
+        return
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                await session.get(RENDER_URL)
+        except Exception as e:
+            print("Error ping auto:", e)
+        await asyncio.sleep(600)  # cada 10 minutos
+
+# -----------------------
 # App
 # -----------------------
 app = ApplicationBuilder().token(TOKEN).build()
@@ -125,12 +138,11 @@ app.add_handler(CommandHandler("help", help_command))
 
 print("Bot iniciado beep beep!")
 
+# Inicia keep-alive
+asyncio.create_task(keep_awake())
+
 # -----------------------
-# Webhook
+# Polling (mantiene el bot despierto)
 # -----------------------
-app.run_webhook(
-    listen="0.0.0.0",
-    port=PORT,
-    webhook_url=WEBHOOK_URL
-)
+app.run_polling()
 

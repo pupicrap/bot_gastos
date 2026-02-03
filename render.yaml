@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: bot-gastos
-    env: python
-    pythonVersion: 3.11.8
-    startCommand: python bot_gastos.py
-
