@@ -127,7 +127,13 @@ async def keep_awake():
 # -----------------------
 # Configuración del bot
 # -----------------------
-app = ApplicationBuilder().token(TOKEN).build()
+
+
+# Hook para iniciar keep_alive cuando el loop esté listo
+async def start_keep_awake(app):
+    asyncio.create_task(keep_awake())
+
+app = ApplicationBuilder().token(TOKEN).post_init(start_keep_awake).build()
 
 # Handlers
 app.add_handler(CommandHandler("gastamos", gastamos))
@@ -137,11 +143,6 @@ app.add_handler(CommandHandler("datosdeuda", datosdeuda))
 app.add_handler(CommandHandler("resetdeuda", resetdeuda))
 app.add_handler(CommandHandler("help", help_command))
 
-# Hook para iniciar keep_alive cuando el loop esté listo
-async def start_keep_awake(app):
-    asyncio.create_task(keep_awake())
-
-app.post_init(start_keep_awake)
 
 print("Bot iniciado beep beep!")
 
