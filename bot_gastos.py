@@ -4,13 +4,14 @@ import json
 import os
 import asyncio
 import aiohttp
+from aiohttp import web
 
 # -----------------------
 # Configuración
 # -----------------------
 TOKEN = os.environ["TOKEN"]
 RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")  # Render la inyecta sola
-PORT = int(os.environ.get("PORT", 10000))
+PORT = int(os.environ.get("PORT", 10000))  # puerto que Render asigna
 DATA_FILE = "deuda.json"
 
 # Inicializar archivo si no existe
@@ -112,7 +113,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # -----------------------
-# Keep-alive para Render
+# Keep-alive y web server para Render
 # -----------------------
 async def keep_awake():
     if not RENDER_URL:
@@ -125,13 +126,20 @@ async def keep_awake():
             print("Error ping auto:", e)
         await asyncio.sleep(600)  # cada 10 minutos
 
-async def start_keep_awake(app):
-    asyncio.create_task(keep_awake())
+async def web_server():
+    async def handle_root(request):
+        return web.Response(text="Bot awake!")
+    app_web = web.Application()
+    app_web.add_routes([web.get("/", handle_root)])
+    runner = web.AppRunner(app_web)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
 
 # -----------------------
 # Configuración del bot
 # -----------------------
-app = ApplicationBuilder().token(TOKEN).post_init(start_keep_awake).build()
+app = ApplicationBuilder().token(TOKEN).build()
 
 # Handlers
 app.add_handler(CommandHandler("gastamos", gastamos))
@@ -144,15 +152,17 @@ app.add_handler(CommandHandler("help", help_command))
 print("Bot iniciado beep beep!")
 
 # -----------------------
-# Polling con puerto expuesto para Render
+# Start polling + tareas async
 # -----------------------
-# Esto evita que Render "duerma" el servicio
 async def main():
-    # Crea task para keep_awake
+    # Lanzar keep-alive y web server dentro del mismo loop
     asyncio.create_task(keep_awake())
-    # Ejecuta polling
+    asyncio.create_task(web_server())
+
+    # Inicia el polling del bot
     await app.run_polling()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# Ejecutar directamente sin asyncio.run(), para no cerrar loops
+asyncio.get_event_loop().create_task(main())
+asyncio.get_event_loop().run_forever()
 
