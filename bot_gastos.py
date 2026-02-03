@@ -9,8 +9,8 @@ import aiohttp
 # Configuración
 # -----------------------
 TOKEN = os.environ["TOKEN"]
-DATA_FILE = "deuda.json"
 RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")  # Render la inyecta sola
+DATA_FILE = "deuda.json"
 
 # Inicializar archivo si no existe
 if not os.path.exists(DATA_FILE):
@@ -125,10 +125,11 @@ async def keep_awake():
         await asyncio.sleep(600)  # cada 10 minutos
 
 # -----------------------
-# App
+# Configuración del bot
 # -----------------------
 app = ApplicationBuilder().token(TOKEN).build()
 
+# Handlers
 app.add_handler(CommandHandler("gastamos", gastamos))
 app.add_handler(CommandHandler("deuda", deuda))
 app.add_handler(CommandHandler("dividir", dividir))
@@ -136,13 +137,16 @@ app.add_handler(CommandHandler("datosdeuda", datosdeuda))
 app.add_handler(CommandHandler("resetdeuda", resetdeuda))
 app.add_handler(CommandHandler("help", help_command))
 
+# Hook para iniciar keep_alive cuando el loop esté listo
+async def start_keep_awake(app):
+    asyncio.create_task(keep_awake())
+
+app.post_init(start_keep_awake)
+
 print("Bot iniciado beep beep!")
 
-# Inicia keep-alive
-asyncio.create_task(keep_awake())
-
 # -----------------------
-# Polling (mantiene el bot despierto)
+# Polling
 # -----------------------
 app.run_polling()
 
