@@ -43,6 +43,25 @@ async def gastamos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total = sum(d["cantidad"] for d in datos)
     await update.message.reply_text(f"Gasto de {cantidad} agregado por {usuario}. Total ahora: {total}")
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    mensaje = (
+        "🤖 *Bot de gastos – Comandos disponibles*\n\n"
+        "/gastamos <monto> <nota>\n"
+        "Ej: /gastamos 10000 almacen chino\n\n"
+        "/datosdeuda\n"
+        "Muestra el detalle de todos los gastos\n\n"
+        "/dividir\n"
+        "Muestra quién debe pagar y quién debe recibir\n\n"
+        "/deuda\n"
+        "Muestra el total de gastos\n\n"
+        "/resetdeuda\n"
+        "Reinicia todos los gastos a 0\n\n"
+        "/help\n"
+        "Muestra esta ayuda"
+    )
+    await update.message.reply_text(mensaje, parse_mode="Markdown")
+
+
 # Comando /deuda
 async def deuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     datos = leer_datos()
@@ -112,6 +131,8 @@ app.add_handler(CommandHandler("deuda", deuda))
 app.add_handler(CommandHandler("dividir", dividir))
 app.add_handler(CommandHandler("datosdeuda", datosdeuda))
 app.add_handler(CommandHandler("resetdeuda", resetdeuda))
+app.add_handler(CommandHandler("help", help_command))
+
 
 print("Bot de gastos iniciado...")
 app.run_polling()
