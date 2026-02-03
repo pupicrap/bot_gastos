@@ -99,7 +99,9 @@ async def resetdeuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -----------------------
 # Token de BotFather
 # -----------------------
-TOKEN = "7920157435:AAH_8bvq3tW5Whj_Tk_8mD2NgbzDfj_W0ZQ"  # <-- PONÉ TU TOKEN AQUÍ
+import os
+TOKEN = os.environ["TOKEN"]
+
 
 # Crear aplicación
 app = ApplicationBuilder().token(TOKEN).build()
